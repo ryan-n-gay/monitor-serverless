@@ -3,25 +3,25 @@ import boto3
 import urllib3
 import os
 
+PHONE_NUMBERS = os.environ['PHONE_NUMBERS']
+
 def hello(event, context):
     client = boto3.client('sns')
 
     http = urllib3.PoolManager(timeout=5.0)
     try:
-        r = http.request('GET', 'http://www.oscn.net/v4')
+        r = http.request('GET', 'http://www.google.com')
 
-        if r.status == 201:
+        if r.status != 200:
             body = {
-                "message": "OSCN is UPPP!!11!"
+                "message": "Google is UPPP!!11!"
             }
         else:
             body = {
-                "message": "OSCN is dowwwwn :("
+                "message": "Solarwinds rewritten in 50 lines of python!11!!"
             }
-            client.publish(
-            PhoneNumber="+14059266362",
-            Message="OSCN is dowwwwn :("
-            )
+            message = body.get("message")
+            sms_notify(client, message)
         
         response = {
             "statusCode": 500,
@@ -32,7 +32,7 @@ def hello(event, context):
 
     except urllib3.exceptions.MaxRetryError as e:
             body = {
-                "message": "Service is down for unknown reason"
+                "message": "Unknown error while checking service"
             }
 
             response = {
@@ -41,3 +41,10 @@ def hello(event, context):
             }
 
             return response
+
+def sms_notify(client, message):
+    for number in PHONE_NUMBERS:
+        client.publish(
+        PhoneNumber = number,
+        Message = message
+        )
