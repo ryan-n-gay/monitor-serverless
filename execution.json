@@ -1,0 +1,39 @@
+{
+  "roleName": "monitor-serverless-dev-us-east-2-lambdaRole",
+  "policies": [
+    {
+      "document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Action": [
+              "logs:CreateLogStream"
+            ],
+            "Resource": [
+              "arn:aws:logs:us-east-2:302146712672:log-group:/aws/lambda/monitor-serverless-dev-hello:*"
+            ],
+            "Effect": "Allow"
+          },
+          {
+            "Action": [
+              "logs:PutLogEvents"
+            ],
+            "Resource": [
+              "arn:aws:logs:us-east-2:302146712672:log-group:/aws/lambda/monitor-serverless-dev-hello:*:*"
+            ],
+            "Effect": "Allow"
+          },
+          {
+            "Action": [
+              "sns:ListBucket"
+            ],
+            "Resource": "arn:aws:s3:::monitor-serverless-dev-serverlessdeploymentbucket-50lfahtpibcv",
+            "Effect": "Allow"
+          }
+        ]
+      },
+      "name": "dev-monitor-serverless-lambda",
+      "type": "inline"
+    }
+  ]
+}
