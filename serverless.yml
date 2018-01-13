@@ -23,23 +23,15 @@ provider:
 
 # you can overwrite defaults here
   stage: dev
-  region: us-east-2
+  region: us-east-1
 
 # you can add statements to the Lambda function's IAM Role here
   iamRoleStatements:
     - Effect: "Allow"
       Action:
-        - "sns:ListBucket"
-      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
-#    - Effect: "Allow"
-#      Action:
-#        - "s3:PutObject"
-#      Resource:
-#        Fn::Join:
-#          - ""
-#          - - "arn:aws:s3:::"
-#            - "Ref" : "ServerlessDeploymentBucket"
-#            - "/*"
+        - "sns:Publish"
+      Resource:
+        - "*"
 
 # you can define service wide environment variables here
 #  environment:
