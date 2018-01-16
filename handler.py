@@ -1,9 +1,11 @@
+import os
 import json
+import yaml
 import boto3
 import urllib3
-import os
 
-PHONE_NUMBERS = os.environ['PHONE_NUMBERS']
+with open('./config.yml') as fp:
+    config = yaml.load(fp)
 
 def hello(event, context):
     client = boto3.client('sns')
@@ -43,8 +45,10 @@ def hello(event, context):
             return response
 
 def sms_notify(client, message):
-    for number in PHONE_NUMBERS:
-        client.publish(
-        PhoneNumber = number,
-        Message = message
-        )
+    for k, v in config['phoneNumbers'].items():
+        for number in v:
+            number = str(number)
+            client.publish(
+            PhoneNumber = number,
+            Message = message
+            )
