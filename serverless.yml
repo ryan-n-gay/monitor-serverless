@@ -46,7 +46,7 @@ package:
   #  - modules/boto3/**
 
 functions:
-  hello:
+  entry:
     handler: entry.entry
 
 #    The following are a few example events you can configure

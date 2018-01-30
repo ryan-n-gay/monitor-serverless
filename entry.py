@@ -9,29 +9,22 @@ with open('./config.yml') as fp:
 
 def entry(event, context):
     client = boto3.client('sns')
-
     http = urllib3.PoolManager(timeout=5.0)
+    response = {}
     try:
-        r = http.request('GET', 'http://www.google.com')
+        for service_name, url in config['services'].items():
+            r = http.request('GET', url)
 
-        if r.status != 200:
-            body = {
-                "message": "Google is UPPP!!11!"
-            }
-        else:
-            body = {
-                "message": "Solarwinds rewritten in 50 lines of python!11!!"
-            }
-            message = body.get("message")
-            sms_notify(client, message)
-        
+            if r.status == 200:
+                body = {
+                    "message": "Service " + service_name + " is down."
+                }
+                message = body.get("message")
+                sms_notify(client, message)
         response = {
-            "statusCode": 500,
-            "body": json.dumps(body)
+        "statusCode": 200,
+        "body": "executed successfully"
         }
-
-        return response
-
     except urllib3.exceptions.MaxRetryError as e:
         body = {
             "message": "Unknown error while checking service"
@@ -42,7 +35,7 @@ def entry(event, context):
             "body": json.dumps(body)
         }
 
-        return response
+    return response
 
 def sms_notify(client, message):
     for phone_number in config['phoneNumbers']:
