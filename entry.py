@@ -7,7 +7,7 @@ import urllib3
 with open('./config.yml') as fp:
     config = yaml.load(fp)
 
-def hello(event, context):
+def entry(event, context):
     client = boto3.client('sns')
 
     http = urllib3.PoolManager(timeout=5.0)
@@ -33,22 +33,20 @@ def hello(event, context):
         return response
 
     except urllib3.exceptions.MaxRetryError as e:
-            body = {
-                "message": "Unknown error while checking service"
-            }
+        body = {
+            "message": "Unknown error while checking service"
+        }
 
-            response = {
-                "statusCode": 500,
-                "body": json.dumps(body)
-            }
+        response = {
+            "statusCode": 500,
+            "body": json.dumps(body)
+        }
 
-            return response
+        return response
 
 def sms_notify(client, message):
-    for k, v in config['phoneNumbers'].items():
-        for number in v:
-            number = str(number)
-            client.publish(
-            PhoneNumber = number,
+    for phone_number in config['phoneNumbers']:
+        client.publish(
+            PhoneNumber = phone_number,
             Message = message
             )

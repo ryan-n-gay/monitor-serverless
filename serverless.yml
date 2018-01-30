@@ -39,15 +39,15 @@ provider:
 
 # you can add packaging information here
 package:
-  #include:
-  #  - modules/**
+  include:
+    - config.yml
   #exclude:
   #  - modules/boto3/**
   #  - modules/boto3/**
 
 functions:
   hello:
-    handler: handler.hello
+    handler: entry.entry
 
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
