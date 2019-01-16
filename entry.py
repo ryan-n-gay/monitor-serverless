@@ -19,104 +19,181 @@ with open('./config.yml') as fp:
 
 def entry(event, context):
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-    http = urllib3.PoolManager(timeout=5.0)
+    http = urllib3.PoolManager(timeout=2.0, retries=urllib3.Retry(3))
 
     response = {}
-    try:
-        for service_name, url in config['services'].items():
+
+    for service_name, url in config['services_401'].items():
+        try:
+            # send an HTTP GET to the url and get the status
+            r = http.request('GET', url)
+
+            # if the HTTP status isn't 401 send an alert
+            # some services require authentication so this is a valid response
+            if r.status != 401:
+                down_service(service_name, r.status)
+
+            # if the service is up, change its state in the db
+            # and send up alert if needed
+            else:
+                up_service(service_name, r.status)
+        # if a connection isn't able to be made, consider the service down        
+        except urllib3.exceptions.MaxRetryError:
+            down_service(service_name, r.status)
+
+    for service_name, url in config['services_403'].items():
+        try:
+            # send an HTTP GET to the url and get the status
+            r = http.request('GET', url)
+
+            # if the HTTP status isn't 403 send an alert
+            # some services require authentication so this is a valid response
+            if r.status != 403:
+                down_service(service_name, r.status)
+
+            # if the service is up, change its state in the db
+            # and send up alert if needed
+            else:
+                up_service(service_name, r.status)
+        # if a connection isn't able to be made, consider the service down        
+        except urllib3.exceptions.MaxRetryError:
+            down_service(service_name, r.status)
+
+    for service_name, url in config['services'].items():
+        try:
             # send an HTTP GET to the url and get the status
             r = http.request('GET', url)
             
-            # if the HTTP status for OCIS isn't 401 send an alert
-            # OCIS requires authentication so this is a valid response
-            if service_name == 'OCIS' and r.status != 401:
-                dynamo_response = table.get_item(
-                    Key={
-                            'id': service_name
-                        }
-                )
+            # if the HTTP status isn't 200 OK send an alert
+            if r.status != 200:
+                down_service(service_name, r.status)
 
-                item = dynamo_response['Item']
-                tracked_state = item['down_state']
-
-                if tracked_state != '1':
-                    down_service(service_name, r.status)
-
-            # for all other services, if the HTTP status isn't 200 OK send an alert
-            elif service_name != 'OCIS' and r.status != 200:
-                dynamo_response = table.get_item(
-                    Key={
-                            'id': service_name
-                        }
-                )
-
-                item = dynamo_response['Item']
-                tracked_state = item['down_state']
-
-                if tracked_state != '1':
-                    down_service(service_name, r.status)
-
+            # if the service is up, change its state in the db
+            # and send up alert if needed
             else:
-                table.put_item(
-                    Item={
-                        'id': service_name,
-                        'down_state': 0,
-                    }
-                )
+                up_service(service_name, r.status)
 
-                logger.info("Service " + service_name + " is up")
+        # if a connection isn't able to be made, consider the service down 
+        except urllib3.exceptions.MaxRetryError:
+            down_service(service_name, r.status)
 
         # send the response if triggered by http request        
         response = {
-        "statusCode": 200,
-        "body": "executed successfully"
+            "statusCode": 200,
+            "body": "executed successfully"
         }
    
-    except urllib3.exceptions.MaxRetryError:
-        body = {
-            "message": "Unknown error while checking service"
-        }
-
-        response = {
-            "statusCode": 500,
-            "body": json.dumps(body)
-        }
-        logger.error("Unknown error while checking service")
-
     return response
 
-def down_service(service_name, status):
+def up_service(service_name, status):
     body = {
-        "message": "Service " + service_name + " is down with a response " +
-                    "code of " + str(status) + "."
+        "text": "Service " + service_name + " is up with a response " + 
+            "code of " + str(status) + "."
     }
-    message = body.get("message")
+    text = body.get("text")
+        
+    try:
+        dynamo_response = table.get_item(
+            Key={
+                    'id': service_name
+                }
+        )
 
-    table.put_item(
+        item = dynamo_response['Item']
+        down_state = item['down_state']
+        
+        # check if the service is currently tracked as down
+        # send an alert that the service is now up
+        if down_state == True:
+
+            response = table.update_item(
+                Key={
+                    'id': service_name
+                },
+                UpdateExpression="set down_state = :ds",
+                ExpressionAttributeValues={
+                    ':ds': False
+                },
+                ReturnValues="UPDATED_NEW"
+            )
+
+            notify_sms(text)
+            notify_slack(body)
+
+    # catch if the db does not have any state yet and set as up
+    except KeyError:
+        table.put_item(
             Item={
                 'id': service_name,
-                'down_state': 1,
+                'down_state': False,
             }
-    )
+        )
 
-    notify_sms(message)
-    notify_slack(body)
+    logger.info(text)
+    
+def down_service(service_name, status):
+    
+    body = {
+        "text": "Service " + service_name + " is down with a response " +
+            "code of " + str(status) + "."
+    }
+    text = body.get("text")
 
-    logger.warn(message)
+    try:
+        dynamo_response = table.get_item(
+            Key={
+                    'id': service_name
+                }
+        )
 
-def notify_sms(message):
+        item = dynamo_response['Item']
+        down_state = item['down_state']
+
+        # check if the service is already tracked as down before alerting
+        if down_state == False:
+            # change the db state to down
+            response = table.update_item(
+                Key={
+                    'id': service_name
+                },
+                UpdateExpression="set down_state = :ds",
+                ExpressionAttributeValues={
+                    ':ds': True
+                },
+                ReturnValues="UPDATED_NEW"
+            )
+
+            notify_sms(text)
+            notify_slack(body)
+
+    # catch if the db does not have any state yet and set as down
+    except KeyError:
+        # change the db state to down
+        table.put_item(
+            Item={
+                'id': service_name,
+                'down_state': True,
+            }
+        )
+
+        notify_sms(text)
+        notify_slack(body)
+
+    logger.info(text)
+
+def notify_sms(text):
     client = boto3.client('sns')
     for phone_number in config['phone_numbers']:
         client.publish(
             PhoneNumber = phone_number,
-            Message = message
+            Message = json.dumps(text)
         )
 
-def notify_slack(message):
+def notify_slack(body):
     http = urllib3.PoolManager()
 
     slack_webhook_url = config['slack_webhook_url']
     r = http.request('POST', slack_webhook_url,
                  headers={'Content-Type': 'application/json'},
-                 body=json.dumps(message)
+                 body=json.dumps(body)
     )
