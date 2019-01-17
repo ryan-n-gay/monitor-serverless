@@ -1,0 +1,12 @@
+global_schedule: rate(10 minutes)
+
+# Specify the phone number using the E.164 format 
+# For example a U.S. phone number in E.164 format would appear as +15555550100
+# Quotes are nececcary to be sure the number is processed as a string so that the + is not dropped
+phone_numbers:
+  - "+15555550100"
+
+slack_webhook_url: "https://hooks.slack.com/services/YOUR_WEBHOOK_URL"
+
+services:
+  Google: www.google.com
